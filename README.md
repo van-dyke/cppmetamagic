@@ -98,6 +98,32 @@ int main()
 **Output:**
 
 *indexSequence<<anonymous> >::indexSequence() [with long unsigned int ...\<anonymous\> = {0ul, 1ul, 2ul, 3ul, 4ul}]*
+	
+We can see, point to point, how makeIndexSequence<3> become index_sequenxe<0, 1, 2>.
+
+We have that makeIndexSequence<3> is defined as typename indexSequenceHelper<3>::type [N is 3]
+
+
+indexSequenceHelper<3> match only the general case so
+
+inherit from indexSequenceHelper<2, 2> [N is 3 and Next... is empty]
+
+
+indexSequenceHelper<2, 2> match only the general case so 
+
+inherit from indexSequenceHelper<1, 1, 2> [N is 2 and Next... is 2]
+
+
+indexSequenceHelper<1, 1, 2> match only the general case so 
+
+inherit from indexSequenceHelper<0, 0, 1, 2> [N is 1 and Next... is 1, 2]
+
+
+indexSequenceHelper<0, 0, 1, 2> match both case (general an partial specialization) so 
+
+the partial specialization is applied and define type = indexSequence<0, 1, 2> [Next... is 0, 1, 2]
+
+
 
 # 4. Determine if a type contains a certain func  (SFINAE)
 
