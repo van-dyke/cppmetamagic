@@ -132,6 +132,8 @@ the partial specialization is applied and define type = indexSequence<0, 1, 2> [
 # 4. Determine if a type contains a certain func  (SFINAE)
 
 **Example from Fedor Pikus CppCon 2015 presentation**
+[ Source: https://www.youtube.com/watch?v=CZi6QqZSbFg ]
+
 
 When T has the sort function defined, the instantiation of the first test works and the null pointer constant is successfully passed. (And the resulting type of the expression is yes.) If it does not work, the only available function is the second test, and the resulting type of the expression is no
 ```cpp
