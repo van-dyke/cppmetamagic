@@ -98,3 +98,76 @@ int main()
 **Output:**
 
 *indexSequence<<anonymous> >::indexSequence() [with long unsigned int ...\<anonymous\> = {0ul, 1ul, 2ul, 3ul, 4ul}]*
+
+# 4. Determine if a type contains a certain func  (SFINAE)
+
+**Example from Fedor Pikus CppCon 2015 presentation**
+
+When T has the sort function defined, the instantiation of the first test works and the null pointer constant is successfully passed. (And the resulting type of the expression is yes.) If it does not work, the only available function is the second test, and the resulting type of the expression is no
+```cpp
+template<typename T>
+struct HasSort
+{
+    using yes = char;
+    using no = char[2];
+    
+    template<typename U>
+    static auto test(void*) -> decltype(&U::sort, yes());    	// C++11
+    //static yes& test( char(*)[sizeof(&U::sort)] );		// C++98
+
+    template<typename U>
+    static no& test(...);
+    
+    static constexpr bool value = ( sizeof( HasSort::test<T>(nullptr) ) == sizeof( HasSort::yes ) );
+
+};
+```
+**Usage:**
+```cpp
+    struct Sortable
+    {
+   	void sort();
+    };
+    
+    ...
+    
+    std::cout << HasSort<int>::value << std::endl;
+    std::cout << HasSort<Sortable>::value << std::endl;
+```
+
+**Output:**
+
+0 <- **no conversion, lack of T::sort(), accept any argument test(...) function**
+
+1 <- **conversion rank is lowest, so a call to the first test() function will be preferred if it is possible**
+
+# 4a SFINAE vs argument deduction
+
+Consider another exmple and its result.
+
+```cpp
+struct Test
+{
+    template<typename U>
+    static int func( char(*)[sizeof(U)] )
+    { std::cout << __PRETTY_FUNCTION__ << std::endl; }
+    
+    template<typename U>
+    static int func( ...)
+    { std::cout << __PRETTY_FUNCTION__ << std::endl; }
+};
+
+...
+
+int main()
+{
+    Test::func<int>(nullptr);
+    Test::func<int>(5);
+}
+```
+
+**Output:**
+
+*static int Test::func(char (*)[sizeof (U)]) [with U = int]*
+
+*static int Test::func(...) [with U = int]* 
