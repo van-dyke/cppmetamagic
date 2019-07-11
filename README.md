@@ -1,7 +1,8 @@
 # cppmetamagic
 Some general purpose metaprogramming tips&amp;tricks in C++
+ 
 
-**1. Enable (compile) part of code if template parameter is true**
+# 1. Compile part of code if template parameter is true
 
 enable_if Implementation:
 ```cpp
@@ -15,7 +16,9 @@ struct enable_if<true, T> 	// partial specialization
     using type = T;
 };
 ```
-**2. Type checking at compile time**
+ 
+ 
+# 2. Type checking at compile time
 
 IsInt implementation:
 
@@ -46,7 +49,8 @@ int main()
 }
 ```
 
-**3. Generate sequences of numbers at compile time**
+
+# 3. Generate sequences of numbers at compile time
 
 Index sequence implementation:
 ```cpp
@@ -67,3 +71,30 @@ struct indexSequenceHelper : public indexSequenceHelper<N-1U, N-1U, Next...>
 template <std::size_t N>
 using makeIndexSeq = typename indexSequenceHelper<N>::type;
 ```
+
+**Usage:**
+
+Let's modify final indexSequence struct for better debug output. Just like this:
+```cpp
+template <std::size_t ...>
+struct indexSequence
+ { 
+    indexSequence()
+    { 
+    	std::cout << __PRETTY_FUNCTION__ << std::endl; 
+    }
+ };
+ 
+ ...
+ 
+ ```
+ ... and test it
+```
+int main()
+{    
+    makeIndexSeq<5> test;
+}
+```
+**Output:**
+
+*indexSequence<<anonymous> >::indexSequence() [with long unsigned int ...\<anonymous\> = {0ul, 1ul, 2ul, 3ul, 4ul}]*
