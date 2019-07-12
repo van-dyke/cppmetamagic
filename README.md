@@ -1,5 +1,4 @@
-# cppmetamagic
-Some general purpose metaprogramming tips&amp;tricks in C++
+# Some C++ metaprogramming tips&tricks
  
 
 # 1. Compile part of code if template parameter is true
@@ -74,7 +73,7 @@ using makeIndexSeq = typename indexSequenceHelper<N>::type;
 
 **Usage:**
 
-Let's modify final indexSequence struct for better debug output. Just like this:
+Let's modify final indexSequence struct for better debug output:
 ```cpp
 template <std::size_t ...>
 struct indexSequence
@@ -203,3 +202,47 @@ int main()
 *static int Test::func(char (*)[sizeof (U)]) [with U = int]*
 
 *static int Test::func(...) [with U = int]* 
+
+
+# 4b Determine if a class contains a certain type
+We can use helper types from type_traits
+```cpp
+#include <type_traits>
+
+
+template<typename T>
+struct Void
+{
+    using type = void;   
+};
+
+template<typename T, typename = void>
+struct has_type : std::false_type { };
+
+template<typename T>
+struct has_type<T, typename Void<typename T::foobar>::type > : std::true_type { };
+
+struct foo {
+  using foobar = float;
+};
+
+int main() 
+{   
+  std::cout << std::boolalpha;
+  std::cout << has_type<int>::value << std::endl;	// Output: false
+  std::cout << has_type<foo>::value << std::endl;	// Output: true
+}
+```
+**Explanation 1 [ Source: https://stackoverflow.com/a/27687803 ]**
+```cpp
+template<typename T>
+struct has_type<T, typename Void<typename T::foobar>::type > : std::true_type { };
+```
+
+That above specialization exists only when it is well formed, so when decltype( T::member ) is valid and not ambiguous. the specialization is so for has_member<T , void> as state in the comment.
+
+When you write has_type<A>, it is has_member<A, void> because of default template argument.
+
+And we have specialization for has_type<A, void> (so inherit from true_type) but we don't have specialization for has_type<B, void> (so we use the default definition : inherit from false_type
+
+**Explanation 2**
