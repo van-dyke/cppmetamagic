@@ -245,4 +245,66 @@ When you write has_type<A>, it is has_member<A, void> because of default templat
 
 And we have specialization for has_type<A, void> (so inherit from true_type) but we don't have specialization for has_type<B, void> (so we use the default definition : inherit from false_type
 
-**Explanation 2**
+**Explanation 2** [Source: https://stackoverflow.com/a/27688405]
+
+When you write has_member<A>::value, the compiler looks up the name has_member and finds the primary class template, that is, this declaration:
+```
+template< class , class = void >
+struct has_member;
+```
+
+The template argument list <A> is compared to the template parameter list of this primary template. Since the primary template has two parameters, but you only supplied one, the remaining parameter is defaulted to the default template argument: void. It's as if you had written has_member<A, void>::value.
+
+Now, the template parameter list is compared against any specializations of the template has_member. Only if no specialization matches, the definition of the primary template is used as a fall-back. So the partial specialization is taken into account:
+```
+template< class T >
+struct has_member< T , void_t< decltype( T::member ) > > : true_type
+{ };
+```
+The compiler tries to match the template arguments A, void with the patterns defined in the partial specialization: T and void_t<..> one by one. First, template argument deduction is performed. The partial specialization above is still a template with template-parameters that need to be "filled" by arguments.
+
+The first pattern, T, allows the compiler to deduce the template-parameter T. This is a trivial deduction, but consider a pattern like T const&, where we could still deduce T. For the pattern T and the template argument A, we deduce T to be A.
+
+In the second pattern void_t< decltype( T::member ) >, the template-parameter T appears in a context where it cannot be deduced from any template argument. There are two reasons for this:
+
+The expression inside decltype is explicitly excluded from template argument deduction. I guess this is because it can be arbitrarily complex.
+
+Even if we used a pattern without decltype like void_t< T >, then the deduction of T happens on the resolved alias template. That is, we resolve the alias template and then try to deduce the type T from the resulting pattern. The resulting pattern however is void, which is not dependent on T and therefore does not allow us to find a specific type for T. This is similar to the mathematical problem of trying to invert a constant function (in the mathematical sense of those terms).
+
+Template argument deduction is finished(*), now the deduced template arguments are substituted. This creates a specialization that looks like this:
+```
+template<>
+struct has_member< A, void_t< decltype( A::member ) > > : true_type
+{ };
+```
+The type void_t< decltype( A::member ) > > can now be evaluated. It is well-formed after substitution, hence, no Substitution Failure occurs. We get:
+```
+template<>
+struct has_member<A, void> : true_type
+{ };
+```
+Now, we can compare the template parameter list of this specialization with the template arguments supplied to the original has_member<A>::value. Both types match exactly, so this partial specialization is chosen.
+
+On the other hand, when we define the template as:
+```
+template< class , class = int > // <-- int here instead of void
+struct has_member : false_type
+{ };
+
+template< class T >
+struct has_member< T , void_t< decltype( T::member ) > > : true_type
+{ };
+```
+We end up with the same specialization:
+```
+template<>
+struct has_member<A, void> : true_type
+{ };
+```
+but our template argument list for has_member<A>::value now is <A, int>. The arguments do not match the parameters of the specialization, and the primary template is chosen as a fall-back.
+
+(*) The Standard, IMHO confusingly, includes the substitution process and the matching of explicitly specified template arguments in the template argument deduction process. For example (post-N4296) [temp.class.spec.match]/2:
+
+A partial specialization matches a given actual template argument list if the template arguments of the partial specialization can be deduced from the actual template argument list.
+
+But this does not just mean that all template-parameters of the partial specialization have to be deduced; it also means that substitution must succeed and (as it seems?) the template arguments have to match the (substituted) template parameters of the partial specialization. Note that I'm not completely aware of where the Standard specifies the comparison between the substituted argument list and the supplied argument list.
