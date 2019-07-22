@@ -308,3 +308,28 @@ but our template argument list for has_member<A>::value now is <A, int>. The arg
 A partial specialization matches a given actual template argument list if the template arguments of the partial specialization can be deduced from the actual template argument list.
 
 But this does not just mean that all template-parameters of the partial specialization have to be deduced; it also means that substitution must succeed and (as it seems?) the template arguments have to match the (substituted) template parameters of the partial specialization. Note that I'm not completely aware of where the Standard specifies the comparison between the substituted argument list and the supplied argument list.
+
+# 5. Unpacking tuples 
+**[Source: http://aherrmann.github.io/programming/2016/02/28/unpacking-tuples-in-cpp14/]**
+
+Suppose we wanted to implement a function that takes an arbitrary tuple and returns a new tuple that holds the first N elements of the original tuple. Let’s call it take_front. Since tuples have fixed size the parameter N will have to be a template parameter.
+```
+template <class Tuple, size_t... Is>
+constexpr auto take_front_impl(Tuple t,
+                               index_sequence<Is...>) {
+    return make_tuple(get<Is>(t)...);
+}
+
+template <size_t N, class Tuple>
+constexpr auto take_front(Tuple t) {
+    return take_front_impl(t, make_index_sequence<N>{});
+}
+```
+The func­tion take_front_impl takes the input tuple and an index_sequence. As be­fore that second pa­ra­meter is only there so that we can get our hands on a pa­ra­meter pack of in­dices. We then use these in­dices to get the el­e­ments of the input tuple and pass them to make_tuple which will con­struct the re­sult. How­ever, at that point we haven’t ac­tu­ally de­fined, yet, which el­e­ments should be put into that new tu­ple. This hap­pens within take_front, which con­structs an index-se­quence con­sisting of the in­dices 0 to N-1 and passes it to take_front_impl.
+
+We can use that func­tion like so.
+```
+    auto t = take_front<2>(make_tuple(1, 2, 3, 4));
+    assert(t == make_tuple(1, 2));
+```
+
