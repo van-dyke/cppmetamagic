@@ -1,7 +1,7 @@
 # Some C++ metaprogramming tips&tricks
  
 
-# 1. Compile part of code if template parameter is true
+# 1a. Compile part of code if template parameter is true
 
 enable_if Implementation:
 ```cpp
@@ -14,6 +14,45 @@ struct enable_if<true, T> 	// partial specialization
 {
     using type = T;
 };
+```
+
+# 1b. Conditional type selection
+```
+template<bool, typename U, typename T>
+struct condition
+{
+    using type = U;
+};
+
+template<typename U, typename T>
+struct condition<true, U, T>
+{
+    using type = T;
+};
+```
+another approach:
+```
+template<bool>
+struct cond
+{
+    template<typename T, typename U>
+    using type = U;
+};
+
+template<>
+struct cond<true>
+{
+    template<typename T, typename U>
+    using type = T;
+};
+```
+**Usage:**
+```
+    std::cout<< sizeof( condition<true, int, char>::type ) << std::endl;	//Output: 1
+    std::cout<< sizeof( condition<false, int, char>::type ) << std::endl;	//Output: 4
+    
+    std::cout<< sizeof( cond<true>::type<int, char> ) << std::endl;		//Output: 1
+    std::cout<< sizeof( cond<false>::type<int, char> ) <<std::endl;		//Output: 4
 ```
  
  
