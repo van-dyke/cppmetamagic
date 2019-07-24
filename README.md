@@ -371,4 +371,35 @@ We can use that func­tion like so.
     auto t = take_front<2>(make_tuple(1, 2, 3, 4));
     assert(t == make_tuple(1, 2));
 ```
+***Example of usage ( custom tuple printer ):***
+```
+template<typename T>
+void tprintf(T t)                   // base function
+{
+    std::cout << t << std::endl;
+}
 
+template<typename T, typename... Targs>
+void tprintf(T value, Targs... Fargs)
+{
+     std::cout << value << std::endl;
+     tprintf(Fargs...); 
+}
+
+template<typename Tup, size_t... Is >
+void unpackHelper(Tup t, std::index_sequence<Is...>)
+{
+    tprintf(std::get<Is>(t)...);
+}
+
+template<typename Tup>
+void printTuple(Tup t)
+{
+    unpackHelper(t, std::make_index_sequence<std::tuple_size<Tup>::value>() );
+}
+```
+And invoke:
+```
+    std::tuple<int, bool, float> t{100, 1, 15.0f};
+    printTuple(t);
+```    
