@@ -287,7 +287,7 @@ And we have specialization for has_type<A, void> (so inherit from true_type) but
 **Explanation 2** [Source: https://stackoverflow.com/a/27688405]
 
 When you write has_member<A>::value, the compiler looks up the name has_member and finds the primary class template, that is, this declaration:
-```
+```cpp
 template< class , class = void >
 struct has_member;
 ```
@@ -295,7 +295,7 @@ struct has_member;
 The template argument list <A> is compared to the template parameter list of this primary template. Since the primary template has two parameters, but you only supplied one, the remaining parameter is defaulted to the default template argument: void. It's as if you had written has_member<A, void>::value.
 
 Now, the template parameter list is compared against any specializations of the template has_member. Only if no specialization matches, the definition of the primary template is used as a fall-back. So the partial specialization is taken into account:
-```
+```cpp
 template< class T >
 struct has_member< T , void_t< decltype( T::member ) > > : true_type
 { };
@@ -311,13 +311,13 @@ The expression inside decltype is explicitly excluded from template argument ded
 Even if we used a pattern without decltype like void_t< T >, then the deduction of T happens on the resolved alias template. That is, we resolve the alias template and then try to deduce the type T from the resulting pattern. The resulting pattern however is void, which is not dependent on T and therefore does not allow us to find a specific type for T. This is similar to the mathematical problem of trying to invert a constant function (in the mathematical sense of those terms).
 
 Template argument deduction is finished(*), now the deduced template arguments are substituted. This creates a specialization that looks like this:
-```
+```cpp
 template<>
 struct has_member< A, void_t< decltype( A::member ) > > : true_type
 { };
 ```
 The type void_t< decltype( A::member ) > > can now be evaluated. It is well-formed after substitution, hence, no Substitution Failure occurs. We get:
-```
+```cpp
 template<>
 struct has_member<A, void> : true_type
 { };
@@ -325,7 +325,7 @@ struct has_member<A, void> : true_type
 Now, we can compare the template parameter list of this specialization with the template arguments supplied to the original has_member<A>::value. Both types match exactly, so this partial specialization is chosen.
 
 On the other hand, when we define the template as:
-```
+```cpp
 template< class , class = int > // <-- int here instead of void
 struct has_member : false_type
 { };
@@ -335,7 +335,7 @@ struct has_member< T , void_t< decltype( T::member ) > > : true_type
 { };
 ```
 We end up with the same specialization:
-```
+```cpp
 template<>
 struct has_member<A, void> : true_type
 { };
@@ -352,7 +352,7 @@ But this does not just mean that all template-parameters of the partial speciali
 **[Source: http://aherrmann.github.io/programming/2016/02/28/unpacking-tuples-in-cpp14/]**
 
 Suppose we wanted to implement a function that takes an arbitrary tuple and returns a new tuple that holds the first N elements of the original tuple. Let’s call it take_front. Since tuples have fixed size the parameter N will have to be a template parameter.
-```
+```cpp
 template <class Tuple, size_t... Is>
 constexpr auto take_front_impl(Tuple t,
                                index_sequence<Is...>) {
@@ -367,12 +367,12 @@ constexpr auto take_front(Tuple t) {
 The func­tion take_front_impl takes the input tuple and an index_sequence. As be­fore that second pa­ra­meter is only there so that we can get our hands on a pa­ra­meter pack of in­dices. We then use these in­dices to get the el­e­ments of the input tuple and pass them to make_tuple which will con­struct the re­sult. How­ever, at that point we haven’t ac­tu­ally de­fined, yet, which el­e­ments should be put into that new tu­ple. This hap­pens within take_front, which con­structs an index-se­quence con­sisting of the in­dices 0 to N-1 and passes it to take_front_impl.
 
 We can use that func­tion like so.
-```
+```cpp
     auto t = take_front<2>(make_tuple(1, 2, 3, 4));
     assert(t == make_tuple(1, 2));
 ```
 ***Example of usage ( custom tuple printer ):***
-```
+```cpp
 template<typename T>
 void tprintf(T t)                   // base function
 {
@@ -399,7 +399,7 @@ void printTuple(Tup t)
 }
 ```
 And invoke:
-```
+```cpp
     std::tuple<int, bool, float> t{100, 1, 15.0f};
     printTuple(t);
 ```    
