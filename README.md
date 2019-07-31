@@ -17,7 +17,7 @@ struct enable_if<true, T> 	// partial specialization
 ```
 
 # 1b. Conditional type selection
-```
+```cpp
 template<bool, typename U, typename T>
 struct condition
 {
@@ -31,7 +31,7 @@ struct condition<true, U, T>
 };
 ```
 another approach:
-```
+```cpp
 template<bool>
 struct cond
 {
@@ -47,7 +47,7 @@ struct cond<true>
 };
 ```
 **Usage:**
-```
+```cpp
     std::cout<< sizeof( condition<true, int, char>::type ) << std::endl;	//Output: 1
     std::cout<< sizeof( condition<false, int, char>::type ) << std::endl;	//Output: 4
     
