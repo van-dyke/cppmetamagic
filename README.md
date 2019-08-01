@@ -432,17 +432,21 @@ constexpr auto arg = Arg<n>{};
 ```
 
 # 7. API — shimming 
-[Source: https://medium.com/@LoopPerfect/c-17-vs-c-14-if-constexpr-b518982bb1e2]
+[Source: https://medium.com/@LoopPerfect/c-17-vs-c-14-if-constexpr-b518982bb1e2] + my improvements...
+
+[***Note:*** There is no need to pass object T into ***supportsAPI*** function and invoke later its method. ]
 
 Sometimes you want to support an alternative API. C++ 14 provides an easy way to check if an object can be used in a certain way:
 
 ```cpp
 template<class T>
-constexpr auto supportsAPI(T x) -> decltype(x.Method1(), x.Method2(), true_type{}) 
+constexpr auto supportsAPI(void*) -> decltype(&T::Method1,  std::true_type{}) 
 {
 	return {};
 }
-constexpr auto supportsAPI(…) -> false_type 
+
+template<class T>
+constexpr auto supportsAPI(...) -> std::false_type 
 {
 	return {};
 }
@@ -459,20 +463,21 @@ struct Two
 };
 
 std::cout << std::boolalpha;
-std::cout << supportsAPI(One{}) << std::endl;	//Output: true
-std::cout << supportsAPI(Two{}) << std::endl;	//Output: false
+std::cout << supportsAPI<One>(nullptr) << std::endl;	//Output: true
+std::cout << supportsAPI<Two>(nullptr) << std::endl;	//Output: false
 
 ```
 Implementing custom behaviour in C++ 14 can be done like this:
 
 ```cpp
 template<class T>
-auto compute(T x) -> decltype( enable_if_t< supportsAPI(T{}), int>{}) 
+auto compute(T x) -> decltype( std::enable_if_t< supportsAPI<T>(nullptr), int>{}) 
 {
-	return x.Method();
+	return x.Method1();
 }
+
 template<class T>
-auto compute(T x) -> decltype( enable_if_t<!supportsAPI(T{}), int>{}) 
+auto compute(T x) -> decltype( std::enable_if_t<!supportsAPI<T>(nullptr), int>{}) 
 {
 	return 0;
 }
@@ -480,5 +485,6 @@ auto compute(T x) -> decltype( enable_if_t<!supportsAPI(T{}), int>{})
 // ...
 
 std::cout << compute(One{}) << std::endl;	//Output: 100
+std::cout << compute(Two{}) << std::endl;	//Output: 0
 
 ```
