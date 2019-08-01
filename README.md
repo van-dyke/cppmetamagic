@@ -404,7 +404,8 @@ And invoke:
     printTuple(t);
 ```    
 
-# 6. Getting the nth-arg [Source: https://medium.com/@LoopPerfect/c-17-vs-c-14-if-constexpr-b518982bb1e2]
+# 6. Getting the nth-arg 
+[Source: https://medium.com/@LoopPerfect/c-17-vs-c-14-if-constexpr-b518982bb1e2]
 
 Many template meta-programs operate on variadic-type-lists. In C++ 14, getting the nth-type of an argument lists is often implemented the following way:
 
@@ -430,7 +431,8 @@ constexpr auto arg = Arg<n>{};
 
 ```
 
-# 7. API — shimming [Source: https://medium.com/@LoopPerfect/c-17-vs-c-14-if-constexpr-b518982bb1e2]
+# 7. API — shimming 
+[Source: https://medium.com/@LoopPerfect/c-17-vs-c-14-if-constexpr-b518982bb1e2]
 
 Sometimes you want to support an alternative API. C++ 14 provides an easy way to check if an object can be used in a certain way:
 
