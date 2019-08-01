@@ -518,3 +518,44 @@ std::cout << compute(One{}) << std::endl;	//Output: 100
 std::cout << compute(Two{}) << std::endl;	//Output: 0
 
 ```
+
+# 8. check if our type T has given constructor (matching the parameter list)
+
+```cpp
+template <typename U>
+std::true_type test(U);
+
+std::false_type test(...);
+
+template <typename T, typename... Ts>
+std::false_type test_has_ctor(...);
+
+template <typename T, typename... Ts>
+auto test_has_ctor(T*) -> decltype(test(std::declval< decltype(T(std::declval<Ts>()...)) >()));
+
+class Test
+{
+    public:
+    Test(int, int) {};
+};
+
+// ...
+std::cout << std::boolalpha;
+std::cout << decltype( test_has_ctor<Test, int, int>(nullptr) )::value		//Output: true
+std::cout << decltype( test_has_ctor<Test, int, int, float>(nullptr) )::value	//Output: false
+```
+The core part is the matching:
+```cpp
+decltype(test(declval<decltype(T(declval<Ts>()...)) >()))
+```
+In this expression we try to build a real object using given set of parameters. We simply try to call its constructor. Let’s read this part by part:
+
+The most outer decltype returns the type of the test function invocation. This might be true_type or false_type depending on what version will be chosen.
+
+Inside we have:
+```cpp
+declval<decltype(T(declval<Ts>()...)) >()
+```
+Now, the most inner part ‘just’ calls the proper constructor. Then we take a type out of that (should be T) and create another value that can be passed to the test function.
+
+***SFINAE in SFINAE…***
