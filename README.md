@@ -403,3 +403,80 @@ And invoke:
     std::tuple<int, bool, float> t{100, 1, 15.0f};
     printTuple(t);
 ```    
+
+# 6. Getting the nth-arg
+
+Many template meta-programs operate on variadic-type-lists. In C++ 14, getting the nth-type of an argument lists is often implemented the following way:
+
+```cpp
+template<unsigned n>
+struct Arg {
+ template<class X, class…Xs>
+ constexpr auto operator()(X x, Xs…xs) {
+   return Arg<n-1>{}(xs…);
+ }
+};
+template<>
+struct Arg<0> {
+ template<class X, class…Xs>
+ constexpr auto operator()(X x, Xs…) {
+   return x;
+ }
+};
+template<unsigned n>
+constexpr auto arg = Arg<n>{};
+
+// arg<2>(0,1,2,3,4,5) == 2;
+
+```
+
+# 7. API — shimming
+
+Sometimes you want to support an alternative API. C++ 14 provides an easy way to check if an object can be used in a certain way:
+
+```cpp
+template<class T>
+constexpr auto supportsAPI(T x) -> decltype(x.Method1(), x.Method2(), true_type{}) 
+{
+	return {};
+}
+constexpr auto supportsAPI(…) -> false_type 
+{
+	return {};
+}
+
+// ...
+struct One
+{
+	int Method1() { return 100; };
+};
+
+struct Two
+{
+    
+};
+
+std::cout << std::boolalpha;
+std::cout << supportsAPI(One{}) << std::endl;	//Output: true
+std::cout << supportsAPI(Two{}) << std::endl;	//Output: false
+
+```
+Implementing custom behaviour in C++ 14 can be done like this:
+
+```cpp
+template<class T>
+auto compute(T x) -> decltype( enable_if_t< supportsAPI(T{}), int>{}) 
+{
+	return x.Method();
+}
+template<class T>
+auto compute(T x) -> decltype( enable_if_t<!supportsAPI(T{}), int>{}) 
+{
+	return 0;
+}
+
+// ...
+
+std::cout << compute(One{}) << std::endl;	//Output: 100
+
+```
