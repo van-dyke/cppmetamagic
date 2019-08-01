@@ -211,7 +211,37 @@ struct HasSort
 
 1 <- **conversion rank is lowest, so a call to the first test() function will be preferred if it is possible**
 
-# 4a SFINAE vs argument deduction
+# 4a Determine if a type contains a certain func  (SFINAE) v2.0
+
+Playing with SFINAE for method detection in C++11 - another working version
+
+This solution use std::decval<T>()
+It converts any type T to a reference type, making it possible to use member functions in decltype expressions without the need to go through constructors.
+
+```cpp
+template <typename T, typename ENABLE = void>
+struct Detect_My_Method : std::false_type
+{
+};
+
+template <typename T>
+struct Detect_My_Method<T, decltype(std::declval<T>().Method())> : std::true_type
+{
+};
+
+// ...
+
+class Foo
+{
+    public:
+        void Method() {};
+};
+
+std::cout << Detect_My_Method<Foo>::value << std::endl;		//Output: 1
+```
+
+
+# 4b SFINAE vs argument deduction
 
 Consider another exmple and its result.
 
@@ -243,7 +273,7 @@ int main()
 *static int Test::func(...) [with U = int]* 
 
 
-# 4b Determine if a class contains a certain type
+# 4c Determine if a class contains a certain type
 We can use helper types from type_traits
 ```cpp
 #include <type_traits>
