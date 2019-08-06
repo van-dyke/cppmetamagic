@@ -54,7 +54,82 @@ struct cond<true>
     std::cout<< sizeof( cond<true>::type<int, char> ) << std::endl;		//Output: 1
     std::cout<< sizeof( cond<false>::type<int, char> ) <<std::endl;		//Output: 4
 ```
- 
+
+# 1c. enable_if - a compile-time switch for templates
+***enable_if*** is an extremely useful tool. There are hundreds of references to it in the C++11 standard template library. It's so useful because it's a key part in using type traits, a way to restrict templates to types that have certain properties. Without ***enable_if***, templates are a rather blunt "catch-all" tool. If we define a function with a template argument, this function will be invoked on all possible types. Type traits and enable_if let us create different functions that act on different kinds of types, while still remaining generic 
+
+```cpp
+#include <iostream>
+#include <string>
+#include <type_traits>
+
+template <typename T>
+typename std::enable_if<std::is_integral<T>::value, T>::type
+t()
+{ return 1; }
+
+template <typename T>
+typename std::enable_if<!std::is_integral<T>::value, T>::type
+t()
+{ return 0; }
+
+template<typename T,
+         typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+auto f() { return 1; }
+
+template<typename T,
+         typename std::enable_if<!std::is_integral<T>::value, int>::type = 0>
+auto f() { return 0; }
+
+
+int main()
+{
+    std::cout << t<int>() << std::endl;		//Output: 1
+    std::cout << t<float>() << std::endl;	//Output: 0
+    
+    std::cout << f<int>() << std::endl;		//Output: 1
+    std::cout << f<float>() << std::endl;	//Output: 0
+        
+}
+```
+This line
+```cpp
+template<typename T,
+         typename std::enable_if<std::is_integral<T>::value, int>::type = 0>
+```
+declares a named template type parameter T and a nameless template value parameter of type ***std::enable_if<std::is_integral<T>::value, int>::type***, i.e. the second parameter declarations is basically a more convoluted version of simple
+
+```cpp
+template <int N = 0> struct S {};
+```
+
+The type ***std::enable_if<std::is_integral<T>::value, int>::type*** resolves into type ***int*** when the enabling condition is met, meaning that the whole thing in such cases is equivalent to
+
+```cpp
+template<typename T, int = 0>
+```
+
+However, since type of that second template parameter is a nested type of a dependent template lfEnableIf, you are required to use the keyword typename to tell the compiler that member Type actually refers to a type and not to something else (i.e. to disambiguate the situation).
+
+Again, the second parameter of the template is nameless, but you can give it a name, if you wish. It won't change anything
+
+```cpp
+template<typename T,
+         typename std::enable_if<std::is_integral<T>::value, int>::type V = 0>
+```
+
+In the above example I called it V. The name of that parameter is not used anywhere in the template, which is why there's no real need to specify it explicitly. It is a dummy parameter, which is also the reason it has a dummy default value (you can replace 0 with 42 - it won't change anything either).
+
+In this case keyword typename creates a misleading similarity between the two parameter declarations of your template. In reality in these parameter declarations the keyword typename serves two very very very different unrelated purposes.
+
+In the first template parameter declaration - typename T - it declares T as a template type parameter. In this role keyword typename can be replaced with keyword class
+
+```cpp
+template <class T, ...
+```
+
+In the second declaration - ***typename std::enable_if<std::is_integral<T>::value, int>::type*** - it serves a secondary purpose - it just tells the compiler that ***std::enable_if<std::is_integral<T>::value, int>::type*** is a type and thus turns the whole thing into a value parameter declaration. In this role keyword typename cannot be replaced with keyword class.
+	
  
 # 2. Type checking at compile time
 
