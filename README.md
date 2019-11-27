@@ -453,7 +453,7 @@ A partial specialization matches a given actual template argument list if the te
 
 But this does not just mean that all template-parameters of the partial specialization have to be deduced; it also means that substitution must succeed and (as it seems?) the template arguments have to match the (substituted) template parameters of the partial specialization. Note that I'm not completely aware of where the Standard specifies the comparison between the substituted argument list and the supplied argument list.
 
-# 5. Unpacking tuples 
+# 5a. Unpacking tuples 
 **[Source: http://aherrmann.github.io/programming/2016/02/28/unpacking-tuples-in-cpp14/]**
 
 Suppose we wanted to implement a function that takes an arbitrary tuple and returns a new tuple that holds the first N elements of the original tuple. Let’s call it take_front. Since tuples have fixed size the parameter N will have to be a template parameter.
@@ -508,6 +508,62 @@ And invoke:
     std::tuple<int, bool, float> t{100, 1, 15.0f};
     printTuple(t);
 ```    
+
+# 5b. Unpacking tuples - another approach
+**[Source: https://stackoverflow.com/questions/16387354/template-tuple-calling-a-function-on-each-element]**
+
+Given a meta-function gen_seq for generating compile-time integer sequences (encapsulated by the seq class template):
+```cpp
+namespace detail
+{
+    template<int... Is>
+    struct seq { };
+
+    template<int N, int... Is>
+    struct gen_seq : gen_seq<N - 1, N - 1, Is...> { };
+
+    template<int... Is>
+    struct gen_seq<0, Is...> : seq<Is...> { };
+}
+```
+
+And the following function templates:
+
+```cpp
+namespace detail
+{
+    template<typename T, typename F, int... Is>
+    void for_each(T&& t, F f, seq<Is...>)
+    {
+        auto l = { (f(std::get<Is>(t)), 0)... };
+    }
+}
+
+template<typename... Ts, typename F>
+void for_each_in_tuple(std::tuple<Ts...> const& t, F f)
+{
+    detail::for_each(t, f, detail::gen_seq<sizeof...(Ts)>());
+}
+```
+You can use the for_each_in_tuple function above this way:
+
+```cpp
+struct my_functor
+{
+    template<typename T>
+    void operator () (T&& t)
+    {
+        std::cout << t << std::endl;
+    }
+};
+
+int main()
+{
+    std::tuple<int, double, std::string> t(42, 3.14, "Hello World!");
+    for_each_in_tuple(t, my_functor());		//Output: 42 3.14 Hello World
+}
+```
+
 
 # 6. Getting the nth-arg 
 [Source: https://medium.com/@LoopPerfect/c-17-vs-c-14-if-constexpr-b518982bb1e2]
