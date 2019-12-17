@@ -564,6 +564,135 @@ int main()
 }
 ```
 
+# 5c. Unpacking tuples - another approach II
+**[Source: https://eli.thegreenplace.net/2014/variadic-templates-in-c/]**
+
+Custom data structures (structs since the times of C and classes in C++) have compile-time defined fields. They can represent types that grow at runtime (std::vector, for example) but if you want to add new fields, this is something the compiler has to see. Variadic templates make it possible to define data structures that could have an arbitrary number of fields, and have this number configured per use. The prime example of this is a tuple class, and here I want to show how to construct one [4].
+
+For the full code that you can play with and compile on your own: variadic-tuple.cpp.
+
+Let's start with the type definition:
+
+```cpp
+template <class... Ts> struct tuple {};
+
+template <class T, class... Ts>
+struct tuple<T, Ts...> : tuple<Ts...> {
+  tuple(T t, Ts... ts) : tuple<Ts...>(ts...), tail(t) {}
+
+  T tail;
+};
+```
+We start with the base case - the definition of a class template named tuple, which is empty. The specialization that follows peels off the first type from the parameter pack, and defines a member of that type named tail. It also derives from the tuple instantiated with the rest of the pack. This is a recursive definition that stops when there are no more types to peel off, and the base of the hierarchy is an empty tuple. To get a better feel for the resulting data structure, let's use a concrete example:
+```cpp
+tuple<double, uint64_t, const char*> t1(12.2, 42, "big");
+```
+Ignoring the constructor, here's a pseudo-trace of the tuple structs created:
+
+```cpp
+struct tuple<double, uint64_t, const char*> : tuple<uint64_t, const char*> {
+  double tail;
+}
+
+struct tuple<uint64_t, const char*> : tuple<const char*> {
+  uint64_t tail;
+}
+
+struct tuple<const char*> : tuple {
+  const char* tail;
+}
+
+struct tuple {
+}
+```
+The layout of data members in the original 3-element tuple will be:
+
+```cpp
+[const char* tail, uint64_t tail, double tail]
+```
+Note that the empty base consumes no space, due to empty base optimization. Using Clang's layout dump feature, we can verify this:
+
+Dumping AST Record Layout
+
+   0 |-struct tuple<double, unsigned long, const char *>
+   
+   0 |----struct tuple<unsigned long, const char *> (base)
+   
+   0 |------struct tuple<const char *> (base)
+   
+   0 |---------struct tuple<> (base) (empty)
+   
+   0 |---------const char * tail
+   
+   8 |------unsigned long tail
+   
+  16 |----double tail
+  
+   sizeof=24, dsize=24, align=8
+   nvsize=24, nvalign=8
+     
+Indeed, the size of the data structure and the internal layout of members is as expected.
+
+So, the struct definition above lets us create tuples, but there's not much else we can do with them yet. The way to access tuples is with the get function template [5], so let's see how it works. First, we'll have to define a helper type that lets us access the type of the k-th element in a tuple:
+```cpp
+template <size_t, class> struct elem_type_holder;
+
+template <class T, class... Ts>
+struct elem_type_holder<0, tuple<T, Ts...>> {
+  typedef T type;
+};
+
+template <size_t k, class T, class... Ts>
+struct elem_type_holder<k, tuple<T, Ts...>> {
+  typedef typename elem_type_holder<k - 1, tuple<Ts...>>::type type;
+};
+```
+***elem_type_holder*** is yet another variadic class template. It takes a number k and the tuple type we're interested in as template parameters. Note that this is a compile-time template metaprogramming construct - it acts on constants and types, not on runtime objects. For example, given ***elem_type_holder<2, some_tuple_type>***, we'll get the following pseudo expansion:
+```cpp
+struct elem_type_holder<2, tuple<T, Ts...>> {
+  typedef typename elem_type_holder<1, tuple<Ts...>>::type type;
+}
+
+struct elem_type_holder<1, tuple<T, Ts...>> {
+  typedef typename elem_type_holder<0, tuple<Ts...>>::type type;
+}
+
+struct elem_type_holder<0, tuple<T, Ts...>> {
+  typedef T type;
+}
+```
+So the ***elem_type_holder<2, some_tuple_type>*** peels off two types from the beginning of the tuple, and sets its type to the type of the third one, which is what we need. Armed with this, we can implement get:
+```cpp
+template <size_t k, class... Ts>
+typename std::enable_if<
+    k == 0, typename elem_type_holder<0, tuple<Ts...>>::type&>::type
+get(tuple<Ts...>& t) {
+  return t.tail;
+}
+
+template <size_t k, class T, class... Ts>
+typename std::enable_if<
+    k != 0, typename elem_type_holder<k, tuple<T, Ts...>>::type&>::type
+get(tuple<T, Ts...>& t) {
+  tuple<Ts...>& base = t;
+  return get<k - 1>(base);
+}
+```
+Here, enable_if is used to select between two template overloads of get - one for when k is zero, and one for the general case which peels off the first type and recurses, as usual with variadic function templates.
+
+Since it returns a reference, we can use get to both read tuple elements and write to them:
+
+```cpp
+tuple<double, uint64_t, const char*> t1(12.2, 42, "big");
+
+std::cout << "0th elem is " << get<0>(t1) << "\n";
+std::cout << "1th elem is " << get<1>(t1) << "\n";
+std::cout << "2th elem is " << get<2>(t1) << "\n";
+
+get<1>(t1) = 103;
+std::cout << "1th elem is " << get<1>(t1) << "\n";
+```
+
 
 # 6. Getting the nth-arg 
 [Source: https://medium.com/@LoopPerfect/c-17-vs-c-14-if-constexpr-b518982bb1e2]
