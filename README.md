@@ -819,3 +819,132 @@ declval<decltype(T(declval<Ts>()...)) >()
 Now, the most inner part ‘just’ calls the proper constructor. Then we take a type out of that (should be T) and create another value that can be passed to the test function.
 
 ***SFINAE in SFINAE…***
+
+# 9a. Function to generate a tuple given a size N and a type T
+[ Source: https://stackoverflow.com/questions/33511753/how-can-i-generate-a-tuple-of-n-type-ts ]
+
+[ Source: https://stackoverflow.com/questions/37093920/function-to-generate-a-tuple-given-a-size-n-and-a-type-t ]
+
+Case : write generate_tuple_type<int, 3> which would internally have a type alias type which would be std::tuple<int, int, int> in this case.
+
+Fairly straightforward recursive formulation:
+
+```cpp
+template<typename T, unsigned N, typename... REST>
+struct generate_tuple_type
+{
+ typedef typename generate_tuple_type<T, N-1, T, REST...>::type type;
+};
+
+template<typename T, typename... REST>
+struct generate_tuple_type<T, 0, REST...>
+{
+  typedef std::tuple<REST...> type;
+};
+
+int main()
+{
+  using gen_tuple_t = generate_tuple_type<int, 3>::type;
+  using hand_tuple_t = std::tuple<int, int, int>;
+  static_assert( std::is_same<gen_tuple_t, hand_tuple_t>::value, "different types" );
+}
+
+```
+
+Another possible example:
+
+```cpp
+template<size_t, class T>
+using T_ = T;
+
+template<class T, size_t... Is>
+auto gen(std::index_sequence<Is...>) { return std::tuple<T_<Is, T>...>{}; }
+
+template<class T, size_t N>
+auto gen() { return gen<T>(std::make_index_sequence<N>{}); } 
+```
+
+And usage:
+
+```cpp
+auto tup = gen<MyType, N>();
+```
+
+# 9b. Produce std::tuple of same type in compile time given its length by a template argument
+[ Source: https://stackoverflow.com/questions/38885406/produce-stdtuple-of-same-type-in-compile-time-given-its-length-by-a-template-a ]
+
+How to implement a function with an int template argument indicating the tuple length and produce a std::tuple, with that length with usage below:
+```cpp
+func<2>() returns std::tuple<int, int>();
+func<5>() returns std::tuple<int, int, int, int, int>().
+```
+
+A recursive solution with alias template and it's implementable in C++11:
+```cpp
+template <size_t I,typename T> 
+struct tuple_n{
+    template< typename...Args> using type = typename tuple_n<I-1, T>::template type<T, Args...>;
+};
+
+template <typename T> 
+struct tuple_n<0, T> {
+    template<typename...Args> using type = std::tuple<Args...>;   
+};
+template <size_t I,typename T>  using tuple_of = typename tuple_n<I,T>::template type<>;
+```
+
+Example of usage:
+
+```cpp
+tuple_of<3, double> t;
+```
+
+Using an index_sequence and a helper type alias you can generate the type you want:
+
+```cpp
+// Just something to take a size_t and give the type `int`
+template <std::size_t>
+using Integer = int;
+
+// will get a sequence of Is = 0, 1, ..., N
+template <std::size_t... Is>
+auto func_impl(std::index_sequence<Is...>) {
+    // Integer<Is>... becomes one `int` for each element in Is...
+    return std::tuple<Integer<Is>...>{};
+}
+
+template <std::size_t N>
+auto func() {
+    return func_impl(std::make_index_sequence<N>{});
+}
+```
+
+It is worth calling out that in the general case you would probably be better with a std::array, (in your case you can't use one), but a std::array can behave like a tuple, similarly to a std::pair.
+
+Update: since you've made it clear you're working with c++11 and not 14+, you'll need to get an implementation of index_sequence and related from somewhere. Here is the C++11 version of func and func_impl with explicit return types:
+
+```cpp
+template <std::size_t... Is>
+auto func_impl(std::index_sequence<Is...>) -> std::tuple<Integer<Is>...> {
+  return std::tuple<Integer<Is>...>{};
+}
+
+template <std::size_t N>
+auto func() -> decltype(func_impl(std::make_index_sequence<N>{})) {
+  return func_impl(std::make_index_sequence<N>{});
+}
+```
+
+And the easiest way:
+
+```cpp
+template<std::size_t N>
+auto array_tuple() {
+    return std::tuple_cat(std::tuple<int>{}, array_tuple<N-1>());
+}
+
+template<>
+auto array_tuple<0>() {
+    return std::tuple<>{};
+}
+```
