@@ -948,3 +948,155 @@ auto array_tuple<0>() {
     return std::tuple<>{};
 }
 ```
+
+# 10. Where and why do I have to put the “template” and “typename” keywords?
+[ Source: https://stackoverflow.com/questions/610245/where-and-why-do-i-have-to-put-the-template-and-typename-keywords ]
+
+In order to parse a C++ program, the compiler needs to know whether certain names are types or not. The following example demonstrates that:
+
+```cpp
+t * f;
+```
+
+How should this be parsed? For many languages a compiler doesn't need to know the meaning of a name in order to parse and basically know what action a line of code does. In C++, the above however can yield vastly different interpretations depending on what t means. If it's a type, then it will be a declaration of a pointer f. However if it's not a type, it will be a multiplication. So the C++ Standard says at paragraph (3/7):
+
+	Some names denote types or templates. In general, whenever a name is encountered 
+	it is necessary to determine whether that name denotes one of these entities before continuing to parse 	
+	the program that contains it. The process that determines this is called name lookup.
+
+How will the compiler find out what a name t::x refers to, if t refers to a template type parameter? x could be a static int data member that could be multiplied or could equally well be a nested class or typedef that could yield to a declaration. If a name has this property - that it can't be looked up until the actual template arguments are known - then it's called a dependent name (it "depends" on the template parameters).
+
+You might recommend to just wait till the user instantiates the template:
+
+	Let's wait until the user instantiates the template, 
+	and then later find out the real meaning of t::x * f;.
+
+This will work and actually is allowed by the Standard as a possible implementation approach. These compilers basically copy the template's text into an internal buffer, and only when an instantiation is needed, they parse the template and possibly detect errors in the definition. But instead of bothering the template's users (poor colleagues!) with errors made by a template's author, other implementations choose to check templates early on and give errors in the definition as soon as possible, before an instantiation even takes place.
+
+So there has to be a way to tell the compiler that certain names are types and that certain names aren't.
+
+***The "typename" keyword***
+
+The answer is: We decide how the compiler should parse this. If t::x is a dependent name, then we need to prefix it by typename to tell the compiler to parse it in a certain way. The Standard says at (14.6/2):
+
+A name used in a template declaration or definition and that is dependent on a template-parameter is assumed not to name a type unless the applicable name lookup finds a type name or the name is qualified by the keyword typename.
+
+There are many names for which typename is not necessary, because the compiler can, with the applicable name lookup in the template definition, figure out how to parse a construct itself - for example with T *f;, when T is a type template parameter. But for t::x * f; to be a declaration, it must be written as typename t::x *f;. If you omit the keyword and the name is taken to be a non-type, but when instantiation finds it denotes a type, the usual error messages are emitted by the compiler. Sometimes, the error consequently is given at definition time:
+
+```cpp
+// t::x is taken as non-type, but as an expression the following misses an
+// operator between the two names or a semicolon separating them.
+t::x f;
+```
+
+The syntax allows typename only before qualified names - it is therefor taken as granted that unqualified names are always known to refer to types if they do so.
+
+A similar gotcha exists for names that denote templates, as hinted at by the introductory text.
+
+***The "template" keyword***
+
+Remember the initial quote above and how the Standard requires special handling for templates as well? Let's take the following innocent-looking example:
+
+```cpp
+boost::function< int() > f;
+```
+
+It might look obvious to a human reader. Not so for the compiler. Imagine the following arbitrary definition of boost::function and f:
+
+```cpp
+namespace boost { int function = 0; }
+int main() { 
+  int f = 0;
+  boost::function< int() > f; 
+}
+```
+
+That's actually a valid expression! It uses the less-than operator to compare boost::function against zero (int()), and then uses the greater-than operator to compare the resulting bool against f. However as you might well know, boost::function in real life is a template, so the compiler knows (14.2/3):
+
+	After name lookup (3.4) finds that a name is a template-name, if this name is followed by a <, 
+	the < is always taken as the beginning of a template-argument-list and never as a name 	
+	followed by the less-than operator.
+
+Now we are back to the same problem as with typename. What if we can't know yet whether the name is a template when parsing the code? We will need to insert template immediately before the template name, as specified by 14.2/4. This looks like:
+
+```cpp
+t::template f<int>(); // call a function template
+```
+
+Template names can not only occur after a :: but also after a -> or . in a class member access. You need to insert the keyword there too:
+
+```cpp
+this->template f<int>(); // call a function template
+```
+
+***Dependencies***
+
+For the people that have thick Standardese books on their shelf and that want to know what exactly I was talking about, I'll talk a bit about how this is specified in the Standard.
+
+In template declarations some constructs have different meanings depending on what template arguments you use to instantiate the template: Expressions may have different types or values, variables may have different types or function calls might end up calling different functions. Such constructs are generally said to depend on template parameters.
+
+The Standard defines precisely the rules by whether a construct is dependent or not. It separates them into logically different groups: One catches types, another catches expressions. Expressions may depend by their value and/or their type. So we have, with typical examples appended:
+
+1. Dependent types (e.g: a type template parameter T)
+2. Value-dependent expressions (e.g: a non-type template parameter N)
+3. Type-dependent expressions (e.g: a cast to a type template parameter (T)0)
+
+Most of the rules are intuitive and are built up recursively: For example, a type constructed as T[N] is a dependent type if N is a value-dependent expression or T is a dependent type. The details of this can be read in section (14.6.2/1) for dependent types, (14.6.2.2) for type-dependent expressions and (14.6.2.3) for value-dependent expressions.
+
+***Dependent names***
+
+The Standard is a bit unclear about what exactly is a dependent name. On a simple read (you know, the principle of least surprise), all it defines as a dependent name is the special case for function names below. But since clearly T::x also needs to be looked up in the instantiation context, it also needs to be a dependent name (fortunately, as of mid C++14 the committee has started to look into how to fix this confusing definition).
+
+To avoid this problem, I have resorted to a simple interpretation of the Standard text. Of all the constructs that denote dependent types or expressions, a subset of them represent names. Those names are therefore "dependent names". A name can take different forms - the Standard says:
+
+	A name is a use of an identifier (2.11), operator-function-id (13.5), conversion-function-id (12.3.2), 
+	or template-id (14.2) that denotes an entity or label (6.6.4, 6.1)
+
+An identifier is just a plain sequence of characters / digits, while the next two are the operator + and operator type form. The last form is template-name <argument list>. All these are names, and by conventional use in the Standard, a name can also include qualifiers that say what namespace or class a name should be looked up in.
+
+A value dependent expression 1 + N is not a name, but N is. The subset of all dependent constructs that are names is called dependent name. Function names, however, may have different meaning in different instantiations of a template, but unfortunately are not caught by this general rule.
+
+***Dependent function names***
+
+Not primarily a concern of this article, but still worth mentioning: Function names are an exception that are handled separately. An identifier function name is dependent not by itself, but by the type dependent argument expressions used in a call. In the example f((T)0), f is a dependent name. In the Standard, this is specified at (14.6.2/1).
+
+***Additional notes and examples***
+
+In enough cases we need both of typename and template. Your code should look like the following
+
+```cpp
+template <typename T, typename Tail>
+struct UnionNode : public Tail {
+    // ...
+    template<typename U> struct inUnion {
+        typedef typename Tail::template inUnion<U> dummy;
+    };
+    // ...
+};
+```
+
+The keyword template doesn't always have to appear in the last part of a name. It can appear in the middle before a class name that's used as a scope, like in the following example
+
+```cpp
+typename t::template iterator<int>::value_type v;
+```
+
+In some cases, the keywords are forbidden, as detailed below
+
+1. On the name of a dependent base class you are not allowed to write typename. It's assumed that the name given is a class type name. This is true for both names in the base-class list and the constructor initializer list:
+
+```cpp
+ template <typename T>
+ struct derive_from_Has_type : /* typename */ SomeBase<T>::type 
+ { };
+```
+
+2. In using-declarations it's not possible to use template after the last ::, and the C++ committee said not to work on a solution.
+
+```cpp
+ template <typename T>
+ struct derive_from_Has_type : SomeBase<T> {
+    using SomeBase<T>::template type; // error
+    using typename SomeBase<T>::type; // typename *is* allowed
+ };
+```
