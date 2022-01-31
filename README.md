@@ -1103,7 +1103,7 @@ In some cases, the keywords are forbidden, as detailed below
 
 # 11. Check callable signature passed in template parameter
 
-In this example we pass callable object (lambda or functor) in template parameter. This callable object requires a special signature. Below you can see example how to check it during compilation:
+In this example we pass callable object (lambda or functor) in template parameter. This callable object requires a special signature which have to be checked during compilation process. See the example below for understanding how it works:	
 	
 ```cpp
 template<typename T, typename GetSomething, typename Equal = std::equal_to<T>, typename Float = float>
