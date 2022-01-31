@@ -1100,3 +1100,22 @@ In some cases, the keywords are forbidden, as detailed below
     using typename SomeBase<T>::type; // typename *is* allowed
  };
 ```
+
+# 11. Check callable signature passed in template parameter
+
+In this example we pass callable object (lambda or functor) in template parameter. This callable object requires a special signature. Below you can see example how to check it during compilation:
+	
+```cpp
+template<typename T, typename GetSomething, typename Equal = std::equal_to<T>, typename Float = float>
+class Test
+{
+    static_assert(std::is_convertible_v<std::invoke_result_t<GetSomething, const T&>, Something<Float>>,
+        "GetSomething must be a callable of signature Something<Float>(const T&)");
+
+    static_assert(std::is_convertible_v<std::invoke_result_t<Equal, const T&, const T&>, bool>,
+        "Equal must be a callable of signature bool(const T&, const T&)");
+
+    static_assert(std::is_arithmetic_v<Float>);
+	
+};	
+```
