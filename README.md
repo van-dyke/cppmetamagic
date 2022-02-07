@@ -1119,3 +1119,57 @@ class Test
 	
 };	
 ```
+
+# 12. Get the type of a lambda argument?
+
+[ Source: https://stackoverflow.com/questions/6512019/can-we-get-the-type-of-a-lambda-argument ]
+	
+The simplest of which is simply overloading: a functor type with a templated operator() (a.k.a a polymorphic functor) simply takes all kind of arguments; so what should argument_type be? Another reason is that generic code (usually) attempts to specify the least constraints on the types and objects it operates on in order to more easily be (re)used.
+
+In other words, generic code is not really interested that given Functor f, typename Functor::argument be int. It's much more interesting to know that f(0) is an acceptable expression. For this C++0x gives tools such as decltype and std::declval (conveniently packaging the two inside std::result_of).
+
+The way I see it you have two choices: require that all functors passed to your template use a C++03-style convention of specifying an argument_type and the like; use the technique below; or redesign. I'd recommend the last option but it's your call since I don't know what your codebase looks like or what your requirements are.
+
+For a monomorphic functor type (i.e. no overloading), it is possible to inspect the operator() member. This works for the closure types of lambda expressions.
+
+```cpp
+template<typename F, typename Ret, typename A, typename... Rest>
+A
+helper(Ret (F::*)(A, Rest...));
+
+template<typename F, typename Ret, typename A, typename... Rest>
+A
+helper(Ret (F::*)(A, Rest...) const);
+
+template<typename F, typename Ret>
+void
+helper(Ret (F::*)() const);
+
+template<typename F, typename Ret>
+void
+helper(Ret (F::*)());
+
+
+template<typename F>
+struct first_argument {
+    typedef decltype( helper(&F::operator()) ) type;
+};
+
+
+int main()
+{
+    
+    auto l = [](double i){ return 1; };
+    auto k = [](){ return 1; };
+    
+    using Type1 = typename first_argument<decltype(l)>::type;
+    using Type2 = typename first_argument<decltype(k)>::type;
+    
+    std::cout << sizeof(Type1) << "\n";
+    std::cout << sizeof(Type2) << "\n"; // warning here !!! Test only !!!
+    
+    return 0;
+}
+```
+
+***Non-capturing lambdas are convertible to function pointers***
