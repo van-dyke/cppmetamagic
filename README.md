@@ -1133,6 +1133,9 @@ The way I see it you have two choices: require that all functors passed to your 
 For a monomorphic functor type (i.e. no overloading), it is possible to inspect the operator() member. This works for the closure types of lambda expressions.
 
 ```cpp
+template<typename Ret, typename A, typename... Rest>
+A helper(Ret(*) (A, Rest...));
+
 template<typename F, typename Ret, typename A, typename... Rest>
 A
 helper(Ret (F::*)(A, Rest...));
@@ -1149,6 +1152,8 @@ template<typename F, typename Ret>
 void
 helper(Ret (F::*)());
 
+template <typename F>
+decltype(helper(&F::operator())) helper(F);
 
 template<typename F>
 struct first_argument {
@@ -1164,9 +1169,11 @@ int main()
     
     using Type1 = typename first_argument<decltype(l)>::type;
     using Type2 = typename first_argument<decltype(k)>::type;
+    using Type3 = typename first_argument<decltype(&function)>::type;
     
     std::cout << sizeof(Type1) << "\n";
     std::cout << sizeof(Type2) << "\n"; // warning here !!! Test only !!!
+    std::cout << sizeof(Type3) << "\n";
     
     return 0;
 }
