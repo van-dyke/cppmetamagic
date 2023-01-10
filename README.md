@@ -1180,3 +1180,126 @@ int main()
 ```
 
 ***Non-capturing lambdas are convertible to function pointers***
+
+
+# 13. How does this implementation of std::is_class work?
+
+[ Source: https://stackoverflow.com/questions/35213658/how-does-this-implementation-of-stdis-class-work ]
+
+Possible implementation:
+
+```cpp
+template<class T, T v>
+    struct integral_constant{
+    static constexpr T value = v;
+    typedef T value_type;
+    typedef integral_constant type;
+    constexpr operator value_type() const noexcept {
+        return value;
+    }
+};
+
+namespace detail {
+    template <class T> char test(int T::*);   //this line
+    struct two{
+        char c[2];
+    };
+    template <class T> two test(...);         //this line
+}
+
+//Not concerned about the is_union<T> implementation right now
+template <class T>
+struct is_class : std::integral_constant<bool, sizeof(detail::test<T>(0))==1 
+                                                   && !std::is_union<T>::value> {};
+```
+
+It was written using programming technologie called "SFINAE" which stands for "Substitution failure is not an error". The basic idea is this:
+
+```cpp
+namespace detail {
+  template <class T> char test(int T::*);   //this line
+  struct two{
+    char c[2];
+  };
+  template <class T> two test(...);         //this line
+}
+```
+
+This namespace provides 2 overloads for test(). Both are templates, resolved at compile time. The first one takes a int T::* as argument. It is called a Member-Pointer and is a pointer to an int, but to an int thats a member of the class T. This is only a valid expression, if T is a class. The second one is taking any number of arguments, which is valid in any case.
+
+So how is it used?
+
+```cpp
+sizeof(detail::test<T>(0))==1
+```
+
+Ok, we pass the function a 0 - this can be a pointer and especially a member-pointer - no information gained which overload to use from this. So if T is a class, then we could use both the T::* and the ... overload here - and since the T::* overload is the more specific one here, it is used. But if T is not a class, then we cant have something like T::* and the overload is ill-formed. But its a failure that happened during template-parameter substitution. And since "substitution failures are not an error" the compiler will silently ignore this overload.
+
+Afterwards is the sizeof() applied. Noticed the different return types? So depending on T the compiler chooses the right overload and therefore the right return type, resulting in a size of either sizeof(char) or sizeof(char[2]).
+
+And finally, since we only use the size of this function and never actually call it, we dont need an implementation.
+
+***The test functions are never actually called. The fact they have no definitions doesn't matter if you don't call them. As you realised, the whole thing happens at compile time, without running any code.***
+
+The expression sizeof(detail::test<T>(0)) uses the sizeof operator on a function call expression. The operand of sizeof is an unevaluated context, which means that the compiler doesn't actually execute that code (i.e. evaluate it to determine the result). It isn't necessary to call that function in order to know the sizeof what the result would be if you called it. To know the size of the result the compiler only needs to see the declarations of the various test functions (to know their return types) and then to perform overload resolution to see which one would be called, and so to find what the sizeof the result would be.
+
+The rest of the puzzle is that the unevaluated function call detail::test<T>(0) determines whether T can be used to form a pointer-to-member type int T::*, which is only possible if T is a class type (because non-classes can't have members, and so can't have pointers to their members). If T is a class then the first test overload can be called, otherwise the second overload gets called. The second overload uses a printf-style ... parameter list, meaning it accepts anything, but is also considered a worse match than any other viable function (otherwise functions using ... would be too "greedy" and get called all the time, even if there's a more specific function t hat matches the arguments exactly). In this code the ... function is a fallback for "if nothing else matches, call this function", so if T isn't a class type the fallback is used.
+
+***It doesn't matter if the class type really has a member variable of type int, it is valid to form the type int T::* anyway for any class (you just couldn't make that pointer-to-member refer to any member if the type doesn't have an int member).***
+
+The int T::* is a pointer to member object. It can be used as follows:
+
+```cpp
+struct T { int x; }
+int main() {
+    int T::* ptr = &T::x;
+
+    T a {123};
+    a.*ptr = 0;
+}
+```
+
+In the other line:
+```cpp
+template<class T> two test(...);
+```
+the ellipsis is a C construct to define that a function takes any number of arguments.
+
+Specifically, in this code:
+```cpp
+namespace detail {
+    template <class T> char test(int T::*);
+    struct two{
+        char c[2];
+    };
+    template <class T> two test(...);
+}
+```
+
+you have two overloads:
+
+one that is matched only when a T is a class type (in which case this one is the best match and "wins" over the second one)
+on that is matched every time
+In the first the sizeof the result yields 1 (the return type of the function is char), the other yields 2 (a struct containing 2 chars).
+
+The boolean value checked is then:
+
+sizeof(detail::test<T>(0)) == 1 && !std::is_union<T>::value
+which means: return true only if the integral constant 0 can be interpreted as a pointer to member of type T (in which case it's a class type), but it's not a union (which is also a possible class type).
+
+Notice that:
+
+```cpp
+struct X {
+void f(int);
+int a;
+};
+struct Y;
+
+int X::* pmi = &X::a;
+void (X::* pmf)(int) = &X::f;
+double X::* pmd;
+char Y::* pmc;
+```
+
+declares pmi, pmf, pmd and pmc to be a pointer to a member of X of type int, a pointer to a member of X of type void(int), a pointer to a member ofX of type double and a pointer to a member of Y of type char respectively. ***The declaration of pmd is well-formed even though X has no members of type double. Similarly, the declaration of pmc is well-formed even though Y is an incomplete type.***
